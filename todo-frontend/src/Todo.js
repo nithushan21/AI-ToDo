@@ -36,11 +36,15 @@ export default function Todo(){
         }
     }
 
+    const getItems = () => {
+        fetch(apiUrl+'/todos')
+        .then((res) => res.json())
+
     return <>
     <div className="row p-3 bg-success text-light">
         <h1>Todo Project with MERN stack</h1>
     </div>   
-    <div className="row">
+    <div className="row mt-3">
         <h3>Todo Add Item</h3>
        {message && <p className="text-success">{message}</p>}
         <div className="form-group">
@@ -51,17 +55,28 @@ export default function Todo(){
         {error && <p className="text-danger">{error}</p>}
     </div> 
     <div className="row mt-3">
-        <h3>Todo List</h3>
+        <h3>Tasks</h3>
         <ul className="list-group">
-            <li className="list-group-item d-flex justify-content-between">
-                <span>Item Text</span>
-            </li>
-            <div>
-                <div>
-                    <button>Edit</button>
-                    <button>Delete</button>
+            <li className="list-group-item bg-info d-flex justify-content-between align-items-center my-2">
+                <div className='d-flex flex-column'>
+                    <span className='fw-bold'>Item Text</span>
+                    <span>Item Desc</span>
                 </div>
-            </div>
+                <div className="d-flex gap">
+                    <button className='btn btn-warning'>Edit</button>
+                    <button className='btn btn-danger'>Delete</button>
+                </div>
+            </li>
+            <li className="list-group-item bg-info d-flex justify-content-between align-items-center my-2">
+                <div className='d-flex flex-column'>
+                    <span className='fw-bold'>Item Text</span>
+                    <span>Item Desc</span>
+                </div>
+                <div className="d-flex gap">
+                    <button className='btn btn-warning'>Edit</button>
+                    <button className='btn btn-danger'>Delete</button>
+                </div>
+            </li>
         </ul>
     </div>
 </>
