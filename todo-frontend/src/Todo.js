@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { getToken } from "./auth";
 
 export default function Todo() {
 
@@ -16,9 +17,19 @@ export default function Todo() {
 
   const apiUrl = "http://localhost:8000";
 
+  const apiFetch = (path, opts = {}) => {
+    const token = getToken();
+    const headers = {
+      "Content-Type": "application/json",
+      ...(opts.headers || {}),
+    };
+    if (token) headers["Authorization"] = `Bearer ${token}`;
+    return fetch(apiUrl + path, { ...opts, headers });
+  };
+
   // ------------------- LOAD TASKS ---------------------
   useEffect(() => {
-    fetch(apiUrl + "/todos")
+    apiFetch("/todos")
       .then((res) => res.json())
       .then((data) => setTodos(data));
   }, []);
@@ -27,9 +38,8 @@ export default function Todo() {
   const handleSubmit = () => {
     if (!title.trim() || !description.trim()) return;
 
-    fetch(apiUrl + "/todos", {
+    apiFetch("/todos", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ title, description }),
     })
       .then((res) => res.json())
@@ -47,17 +57,15 @@ export default function Todo() {
     setAiLoading(true);
 
     try {
-      const ai = await fetch(apiUrl + "/ai/parse", {
+      const ai = await apiFetch("/ai/parse", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text: nlInput }),
       }).then((res) => res.json());
 
       setNlInput("");
 
-      const saved = await fetch(apiUrl + "/todos", {
+      const saved = await apiFetch("/todos", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(ai),
       }).then((res) => res.json());
 
@@ -75,18 +83,16 @@ export default function Todo() {
     setAiLoading(true);
 
     try {
-      const ai = await fetch(apiUrl + "/ai/improve", {
+      const ai = await apiFetch("/ai/improve", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           title: item.title,
           description: item.description,
         }),
       }).then((res) => res.json());
 
-      const updated = await fetch(apiUrl + "/todos/" + item._id, {
+      const updated = await apiFetch("/todos/" + item._id, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           title: ai.improvedTitle,
           description: ai.improvedDescription,
@@ -114,9 +120,8 @@ export default function Todo() {
   };
 
   const handleUpdate = () => {
-    fetch(apiUrl + "/todos/" + editId, {
+    apiFetch("/todos/" + editId, {
       method: "PUT",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         title: editTitle,
         description: editDescription,
@@ -133,7 +138,7 @@ export default function Todo() {
   const handleDelete = (id) => {
     if (!window.confirm("Delete this task?")) return;
 
-    fetch(apiUrl + "/todos/" + id, { method: "DELETE" }).then(() =>
+    apiFetch("/todos/" + id, { method: "DELETE" }).then(() =>
       setTodos(todos.filter((t) => t._id !== id))
     );
   };
