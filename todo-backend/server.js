@@ -1,182 +1,191 @@
-//Using Express
-const OpenAI = require("openai");
-const openai = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY   // store key in .env
-});
-const express = require('express');
-const mongoose = require('mongoose');
-const cors = require('cors');
+// ===============================================
+// Load Environment Variables
+// ===============================================
+require("dotenv").config();
+const express = require("express");
+const mongoose = require("mongoose");
+const cors = require("cors");
+const axios = require("axios");
 
 const app = express();
 app.use(express.json());
 app.use(cors());
 
-//MongoDB connection
-mongoose.connect('mongodb://localhost:27017/todo-MERN', {})
-    .then(() => console.log('MongoDB connected'))
-    .catch(err => console.error('MongoDB connection error:', err));
+// ===============================================
+// Azure Cognitive Services Configuration
+// ===============================================
+const AZURE_ENDPOINT = process.env.AZURE_OPENAI_ENDPOINT;  
+const AZURE_KEY = process.env.AZURE_OPENAI_API_KEY;
+const DEPLOYMENT = process.env.AZURE_OPENAI_DEPLOYMENT_NAME;
+const API_VERSION = process.env.AZURE_OPENAI_API_VERSION;
 
-//Creating schema
+// Generic Azure Chat Request Function
+async function azureChat(messages) {
+  const url = `${AZURE_ENDPOINT}/openai/deployments/${DEPLOYMENT}/chat/completions?api-version=${API_VERSION}`;
+
+  const response = await axios.post(
+    url,
+    { messages },
+    {
+      headers: {
+        "Content-Type": "application/json",
+        "api-key": AZURE_KEY,
+      },
+    }
+  );
+
+  return response.data.choices[0].message.content;
+}
+
+// ===============================================
+// Clean JSON Helper (removes markdown)
+// ===============================================
+function cleanJSON(text) {
+  return text
+    .replace(/```json/gi, "")
+    .replace(/```/g, "")
+    .trim();
+}
+
+// ===============================================
+// MongoDB Connection
+// ===============================================
+mongoose
+  .connect("mongodb://localhost:27017/todo-MERN", {})
+  .then(() => console.log("MongoDB Connected"))
+  .catch((err) => console.error("MongoDB error:", err));
+
+// ===============================================
+// Mongoose Schema
+// ===============================================
 const todoSchema = new mongoose.Schema({
-    title: { required: true, type: String },
-    description: String,
-    category: String,
-    priority: String,
-    dueDate: Date,
-    estimatedTime: String
+  title: String,
+  description: String,
+  category: String,
+  priority: String,
+  dueDate: String,
+  estimatedTime: String
 });
 
-//Creating model
-const todoModel = mongoose.model('Todo', todoSchema);
+const Todo = mongoose.model("Todo", todoSchema);
 
-// ------------------------------
+// ===============================================
 // CRUD ROUTES
-// ------------------------------
+// ===============================================
 
-//Create a new todo item
-app.post('/todos', async (req, res) => {
-    try {
-        const newTodo = new todoModel(req.body);
-        await newTodo.save();
-        res.status(201).json(newTodo);
-    } catch (error) {
-        console.error('Error creating todo:', error);
-        res.status(500).json({ message: error.message });
-    }
+// Create Task
+app.post("/todos", async (req, res) => {
+  try {
+    const saved = await new Todo(req.body).save();
+    res.json(saved);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
-// Get all items
-app.get('/todos', async (req, res) => {
-    try {
-        const todos = await todoModel.find();
-        res.json(todos);
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: error.message });
-    }
+// Get All Tasks
+app.get("/todos", async (req, res) => {
+  res.json(await Todo.find());
 });
 
-// Update a todo item
+// Update Task
 app.put("/todos/:id", async (req, res) => {
-    try {
-        const id = req.params.id;
-        const updatedTodo = await todoModel.findByIdAndUpdate(
-            id,
-            req.body,
-            { new: true }
-        );
-        if (!updatedTodo) {
-            return res.status(404).json({ message: 'Todo not found' });
-        }
-        res.json(updatedTodo);
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: error.message });
-    }
+  const updated = await Todo.findByIdAndUpdate(req.params.id, req.body, { new: true });
+  res.json(updated);
 });
 
-// Delete a todo item
+// Delete Task
 app.delete("/todos/:id", async (req, res) => {
-    try {
-        const id = req.params.id;
-        await todoModel.findByIdAndDelete(id);
-        res.status(204).end();
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: error.message });
-    }
+  await Todo.findByIdAndDelete(req.params.id);
+  res.status(204).end();
 });
 
-// ------------------------------
+// ===============================================
 // AI ROUTES
-// ------------------------------
+// ===============================================
 
-// 1️⃣ AI Natural Language Task Parsing
+// 1️⃣ AI Parse Natural Language Task
 app.post("/ai/parse", async (req, res) => {
-    try {
-        const { text } = req.body;
+  try {
+    const prompt = `
+Return ONLY valid JSON. No markdown, no explanations.
 
-        const prompt = `
-        Convert this task into JSON with:
-        - title
-        - description
-        - category
-        - priority
-        - dueDate (ISO format if date mentioned else null)
-        - estimatedTime (if duration mentioned else null)
+{
+ "title": "",
+ "description": "",
+ "category": "",
+ "priority": "",
+ "dueDate": "",
+ "estimatedTime": ""
+}
 
-        Task: "${text}"
-        `;
+Task: "${req.body.text}"
+`;
 
-        const response = await openai.chat.completions.create({
-            model: "gpt-4o-mini",
-            messages: [{ role: "user", content: prompt }]
-        });
+    const raw = await azureChat([{ role: "user", content: prompt }]);
+    const cleaned = cleanJSON(raw);
 
-        const ai = JSON.parse(response.choices[0].message.content);
-        res.json(ai);
+    res.json(JSON.parse(cleaned));
 
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
+  } catch (err) {
+    console.error("AI PARSE ERROR:", err);
+    res.status(500).json({ error: err.message });
+  }
 });
 
-// 2️⃣ Improve title & description
+// 2️⃣ AI Improve Task
 app.post("/ai/improve", async (req, res) => {
-    try {
-        const { title, description } = req.body;
+  try {
+    const prompt = `
+Return ONLY valid JSON. No markdown.
 
-        const prompt = `
-        Improve this task. Return JSON:
-        { "improvedTitle": "", "improvedDescription": "" }
+{
+ "improvedTitle": "",
+ "improvedDescription": ""
+}
 
-        Title: "${title}"
-        Description: "${description}"
-        `;
+Title: "${req.body.title}"
+Description: "${req.body.description}"
+`;
 
-        const response = await openai.chat.completions.create({
-            model: "gpt-4o-mini",
-            messages: [{ role: "user", content: prompt }]
-        });
+    const raw = await azureChat([{ role: "user", content: prompt }]);
+    const cleaned = cleanJSON(raw);
 
-        const improved = JSON.parse(response.choices[0].message.content);
-        res.json(improved);
+    res.json(JSON.parse(cleaned));
 
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
+  } catch (err) {
+    console.error("AI IMPROVE ERROR:", err);
+    res.status(500).json({ error: err.message });
+  }
 });
 
-// 3️⃣ Auto category + priority
+// 3️⃣ AI Categorize + Prioritize Task
 app.post("/ai/classify", async (req, res) => {
-    try {
-        const { title, description } = req.body;
+  try {
+    const prompt = `
+Return ONLY valid JSON.
 
-        const prompt = `
-        Categorize and set priority. Return JSON:
-        { "category": "", "priority": "" }
+{
+ "category": "",
+ "priority": ""
+}
 
-        Title: "${title}"
-        Description: "${description}"
-        `;
+Title: "${req.body.title}"
+Description: "${req.body.description}"
+`;
 
-        const response = await openai.chat.completions.create({
-            model: "gpt-4o-mini",
-            messages: [{ role: "user", content: prompt }]
-        });
+    const raw = await azureChat([{ role: "user", content: prompt }]);
+    const cleaned = cleanJSON(raw);
 
-        const result = JSON.parse(response.choices[0].message.content);
-        res.json(result);
+    res.json(JSON.parse(cleaned));
 
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
+  } catch (err) {
+    console.error("AI CLASSIFY ERROR:", err);
+    res.status(500).json({ error: err.message });
+  }
 });
 
-// ------------------------------
-// START SERVER (Always last)
-// ------------------------------
-const port = 8000;
-app.listen(port, () => {
-    console.log(`Server is listening on port ${port}`);
-});
+// ===============================================
+// Start Server
+// ===============================================
+app.listen(8000, () => console.log("Server running on port 8000"));
