@@ -22,14 +22,7 @@ function App() {
       )}
       {page === "register" && <Register goLogin={() => setPage("login")} />}
 
-      {page === "todo" && (
-        <>
-          <button className="btn btn-danger m-3" onClick={handleLogout}>
-            Logout
-          </button>
-          <Todo />
-        </>
-      )}
+      {page === "todo" && <Todo onLogout={handleLogout} />}
     </div>
   );
 }

@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { saveToken } from "./auth";
 
-export default function Login({ onLogin }) {
+export default function Login({ onLogin, goRegister }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const api = "http://localhost:8000/auth/login";
@@ -63,7 +63,7 @@ export default function Login({ onLogin }) {
           <span
             className="text-primary fw-semibold"
             style={{ cursor: "pointer" }}
-            onClick={() => onLogin("register")}
+            onClick={() => goRegister && goRegister()}
           >
             Register
           </span>

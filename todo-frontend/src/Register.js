@@ -63,7 +63,7 @@ export default function Register({ goLogin }) {
         </div>
 
         <button
-          className="btn btn-success btn-lg w-100 rounded-3 mb-3"
+          className="btn btn-dark btn-lg w-100 rounded-3 mb-3"
           onClick={handleRegister}
         >
           Register
@@ -87,14 +87,14 @@ export default function Register({ goLogin }) {
           display: flex;
           justify-content: center;
           align-items: center;
-          background: linear-gradient(135deg, #dfe9f3 0%, #ffffff 100%);
+          background: linear-gradient(135deg, #e3ffe7 0%, #d9e7ff 100%);
           padding: 20px;
         }
 
         .auth-card {
           width: 100%;
-          max-width: 450px;
-          background: rgba(255, 255, 255, 0.85);
+          max-width: 420px;
+          background: rgba(255, 255, 255, 0.8);
           backdrop-filter: blur(10px);
         }
       `}</style>
